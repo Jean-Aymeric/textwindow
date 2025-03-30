@@ -73,6 +73,33 @@ public class TextWindow extends JFrame {
     }
 
     /**
+     * Constructor with title.
+     * Creates a new text window with the specified title, font size 12f, background color white, and foreground color black.
+     *
+     * @param title - the title of the window
+     */
+    public TextWindow(final String title) {
+        this(title,
+             TextWindow.DEFAULT_FONT_SIZE,
+             TextWindow.DEFAULT_BACKGROUND_COLOR,
+             TextWindow.DEFAULT_FOREGROUND_COLOR);
+    }
+
+    /**
+     * Constructor with title and font size.
+     * Creates a new text window with the specified title, font size, background color white, and foreground color black.
+     *
+     * @param title    - the title of the window
+     * @param fontSize - the font size of the text
+     */
+    public TextWindow(final String title, final float fontSize) {
+        this(title,
+             fontSize,
+             TextWindow.DEFAULT_BACKGROUND_COLOR,
+             TextWindow.DEFAULT_FOREGROUND_COLOR);
+    }
+
+    /**
      * Displays the text in the window.
      *
      * @param text - the text to be displayed
