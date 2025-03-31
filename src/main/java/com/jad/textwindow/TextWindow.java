@@ -64,11 +64,12 @@ public class TextWindow extends JFrame {
         this.setLayout(new BorderLayout());
         this.textArea.setFont(font);
         this.textArea.setEditable(false);
-        this.textArea.setForeground(fixBackgroundColor);
-        this.textArea.setBackground(fixForegroundColor);
+        this.textArea.setForeground(fixForegroundColor);
+        this.textArea.setBackground(fixBackgroundColor);
         final JPanel panel = new JPanel();
         this.add(panel, BorderLayout.CENTER);
         panel.add(this.textArea);
+        panel.setBackground(fixBackgroundColor);
         this.setVisible(true);
     }
 
