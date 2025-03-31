@@ -20,14 +20,6 @@ import java.util.Objects;
  * The default font size is 12f, the default background color is white, and the default foreground color is black.
  */
 public class TextWindow extends JFrame {
-    public static final int DEFAULT_SCREEN_WIDTH = 548;
-    public static final int DEFAULT_SCREEN_HEIGHT = 126;
-    public static final Dimension SCREEN_DIMENSION = Toolkit.getDefaultToolkit().getScreenSize();
-    private static final float DEFAULT_FONT_SIZE = 12f;
-    private static final Color DEFAULT_BACKGROUND_COLOR = Color.WHITE;
-    private static final Color DEFAULT_FOREGROUND_COLOR = Color.BLACK;
-    private static final boolean DEFAULT_LISTEN_MOUSE_MOTION = true;
-    private static final boolean DEFAULT_LISTEN_KEYBOARD = true;
     private final int fontWidth;
     private final int fontHeight;
     private final JTextArea textArea;
@@ -39,40 +31,23 @@ public class TextWindow extends JFrame {
      * Creates a new text window with the title "No title", font size 12f, background color white, and foreground color black.
      */
     public TextWindow() {
-        this("No title",
-             TextWindow.DEFAULT_FONT_SIZE,
-             TextWindow.DEFAULT_BACKGROUND_COLOR,
-             TextWindow.DEFAULT_FOREGROUND_COLOR,
-             TextWindow.DEFAULT_LISTEN_MOUSE_MOTION,
-             TextWindow.DEFAULT_LISTEN_KEYBOARD,
-             TextWindow.DEFAULT_SCREEN_WIDTH,
-             TextWindow.DEFAULT_SCREEN_HEIGHT);
+        this(new TextWindowSettings());
     }
 
     /**
      * Constructor with title, font size, background color, and foreground color.
-     *
-     * @param title           - the title of the window
-     * @param fontSize        - the font size of the text
-     * @param backgroundColor - the background color of the text area
-     * @param foregroundColor - the foreground color of the text area
      */
-    public TextWindow(final String title,
-                      final float fontSize,
-                      final Color backgroundColor,
-                      final Color foregroundColor,
-                      final boolean listenMouseMotion,
-                      final boolean listenKeyboard,
-                      final int screenWidth,
-                      final int screenHeight) {
-        super(title);
-        final float fixFontSize = Math.min(40f, Math.max(1f, fontSize));
+    public TextWindow(TextWindowSettings settings) {
+        super(settings.getTitle());
+        final float fixFontSize = Math.min(40f, Math.max(1f, settings.getFontSize()));
         final Color fixBackgroundColor =
-                backgroundColor == null ? TextWindow.DEFAULT_BACKGROUND_COLOR : backgroundColor;
+                settings.getBackgroundColor() == null ? TextWindowUtils.DEFAULT_BACKGROUND_COLOR :
+                        settings.getBackgroundColor();
         final Color fixForegroundColor =
-                foregroundColor == null ? TextWindow.DEFAULT_FOREGROUND_COLOR : foregroundColor;
-        final int fixScreenWidth = Math.max(20, screenWidth);
-        final int fixScreenHeight = Math.max(10, screenHeight);
+                settings.getForegroundColor() == null ? TextWindowUtils.DEFAULT_FOREGROUND_COLOR :
+                        settings.getForegroundColor();
+        final int fixScreenWidth = Math.max(20, settings.getScreenWidth());
+        final int fixScreenHeight = Math.max(10, settings.getScreenHeight());
 
         this.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         this.setExtendedState(this.getExtendedState() | JFrame.MAXIMIZED_BOTH);
@@ -86,8 +61,8 @@ public class TextWindow extends JFrame {
         } catch (final FontFormatException | IOException exception) {
             throw new RuntimeException(exception);
         }
-        this.mousePosition = new Point((int) (TextWindow.SCREEN_DIMENSION.getWidth() / 2),
-                                       (int) (TextWindow.SCREEN_DIMENSION.getHeight() / 2));
+        this.mousePosition = new Point((int) (TextWindowUtils.SCREEN_DIMENSION.getWidth() / 2),
+                                       (int) (TextWindowUtils.SCREEN_DIMENSION.getHeight() / 2));
         this.setLayout(new BorderLayout());
         this.textArea = new JTextArea(fixScreenHeight, fixScreenWidth);
         this.textArea.setFont(font);
@@ -105,7 +80,7 @@ public class TextWindow extends JFrame {
         this.setContentPane(panel);
         panel.setBackground(Color.PINK);
         panel.add(this.textArea, BorderLayout.CENTER);
-        if (listenMouseMotion) this.textArea.addMouseMotionListener(new MouseMotionHandler());
+        if (settings.isListenMouseMotion()) this.textArea.addMouseMotionListener(new MouseMotionHandler());
         this.pack();
         this.setLocationRelativeTo(null);
         this.setVisible(true);
@@ -119,40 +94,6 @@ public class TextWindow extends JFrame {
         return new Point(x, y);
     }
 
-    /**
-     * Constructor with title.
-     * Creates a new text window with the specified title, font size 12f, background color white, and foreground color black.
-     *
-     * @param title - the title of the window
-     */
-    public TextWindow(final String title) {
-        this(title,
-             TextWindow.DEFAULT_FONT_SIZE,
-             TextWindow.DEFAULT_BACKGROUND_COLOR,
-             TextWindow.DEFAULT_FOREGROUND_COLOR,
-             TextWindow.DEFAULT_LISTEN_MOUSE_MOTION,
-             TextWindow.DEFAULT_LISTEN_KEYBOARD,
-             TextWindow.DEFAULT_SCREEN_WIDTH,
-             TextWindow.DEFAULT_SCREEN_HEIGHT);
-    }
-
-    /**
-     * Constructor with title and font size.
-     * Creates a new text window with the specified title, font size, background color white, and foreground color black.
-     *
-     * @param title    - the title of the window
-     * @param fontSize - the font size of the text
-     */
-    public TextWindow(final String title, final float fontSize) {
-        this(title,
-             fontSize,
-             TextWindow.DEFAULT_BACKGROUND_COLOR,
-             TextWindow.DEFAULT_FOREGROUND_COLOR,
-             TextWindow.DEFAULT_LISTEN_MOUSE_MOTION,
-             TextWindow.DEFAULT_LISTEN_KEYBOARD,
-             TextWindow.DEFAULT_SCREEN_WIDTH,
-             TextWindow.DEFAULT_SCREEN_HEIGHT);
-    }
 
     private void setMouseCursorInvisible() {
         final BufferedImage cursorImg = new BufferedImage(16, 16, BufferedImage.TYPE_INT_ARGB);
@@ -172,22 +113,12 @@ public class TextWindow extends JFrame {
         String[] lines = text.split("\n");
         for (int i = 0; i < this.screenSize.height; i++) {
             stringBuilder
-                    .append(TextWindow.formatString((i < lines.length) ? lines[i] : "", this.screenSize.width))
+                    .append(TextWindowUtils.formatString((i < lines.length) ? lines[i] : "", this.screenSize.width))
                     .append(((i + 1) == this.screenSize.height) ? "" : "\n");
         }
         this.textArea.setText(stringBuilder.toString());
     }
 
-
-    public static String formatString(String str, int length) {
-        if (str.length() > length) {
-            // Tronquer si la chaîne est trop longue
-            return str.substring(0, length);
-        } else {
-            // Compléter avec des espaces si elle est trop courte
-            return String.format("%-" + length + "s", str);
-        }
-    }
 
     /**
      * Closes the text window.
