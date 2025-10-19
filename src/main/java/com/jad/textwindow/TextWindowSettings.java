@@ -32,6 +32,7 @@ import java.util.Objects;
  * <li>mouse visibility: {@value TextWindowUtils#DEFAULT_MOUSE_VISIBILITY}</li>
  * </ul>
  */
+@SuppressWarnings({"unused", "GrazieInspection"})
 public final class TextWindowSettings {
 
     private final List<TWKeyboardListener> keyboardListeners = new ArrayList<>();

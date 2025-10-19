@@ -1,5 +1,6 @@
 package com.jad.textwindow;
 
+@SuppressWarnings("unused")
 abstract class TWActionState<E> {
     private final String key;
     private E value;

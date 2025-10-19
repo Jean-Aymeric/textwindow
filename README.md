@@ -27,8 +27,8 @@ The `TextWindow` class is a custom GUI component designed to display and manage 
 public static void main(String[] args) {
     TextWindowSettings settings = new TextWindowSettings();
     settings.setTitle("My Text Window");
-    settings.setWidth(400);
-    settings.setHeight(300);
+    settings.setScreenWidth(200);
+    settings.setScreenHeight(30);
     settings.setBackgroundColor(Color.WHITE);
     settings.setForegroundColor(Color.BLACK);
     settings.setFontSize(14);
