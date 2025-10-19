@@ -208,6 +208,23 @@ public class TextWindow extends JFrame {
         return new Point(x, y);
     }
 
+    @Override
+    public void setForeground(Color foreground) {
+        super.setForeground(foreground);
+        if (this.textArea != null) {
+            this.textArea.setForeground(foreground);
+            this.textArea.setDisabledTextColor(foreground);
+        }
+    }
+
+    @Override
+    public void setBackground(Color background) {
+        super.setBackground(background);
+        if (this.textArea != null) {
+            this.textArea.setBackground(background);
+        }
+    }
+
     /**
      * Returns if the action is off.
      *
