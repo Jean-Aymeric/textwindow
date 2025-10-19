@@ -8,7 +8,7 @@
     <artifactId>textwindow</artifactId>
     <name>textwindow</name>
     <description>A class to display text in a JFrame and update this text.</description>
-    <version>1.1.0</version>
+    <version>1.1.1</version>
 
     <properties>
         <maven.compiler.source>21</maven.compiler.source>
