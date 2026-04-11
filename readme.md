@@ -1,115 +1,92 @@
-# maven-public-repository
+# TextWindow Class
+
+[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
 
 # Made with ❤️ by [JAD](mailto:jeanaymeric@gmail.com)
 
 ---
 
-Public repository for maven packages shared with my students
+## Description
+
+The `TextWindow` class is a custom GUI component designed to display and manage text content within a window.
+
 
 ---
 
-# How to use the repository
+## Features
 
-## Create a GitHub Personal Access Token for Maven Repository Access
+- Create a text window with customizable title, size, and colors.
+- Display text content with support for multiple lines.
+- Change foreground and background colors.
+- Adjust font size.
+- Handle key and mouse events with character position coordinates.
 
----
+## Example Simple
 
-1. **Log In to Your GitHub Account**:
-    - Go to [https://github.com](https://github.com) and log in with your credentials.
+```java
+public static void main(String[] args) {
+    TextWindowSettings settings = new TextWindowSettings();
+    settings.setTitle("My Text Window");
+    settings.setScreenWidth(200);
+    settings.setScreenHeight(30);
+    settings.setBackgroundColor(Color.WHITE);
+    settings.setForegroundColor(Color.BLACK);
+    settings.setFontSize(14);
 
-2. **Navigate to Personal Access Token Settings**:
-    - Click on your profile picture in the top-right corner.
-    - Select **Settings** from the dropdown menu.
-    - In the left sidebar, scroll down and click on **Developer settings**.
-    - Select **Personal access tokens** and then click on **Tokens (classic)**.
-
-3. **Generate a New Token**:
-    - Click on the **Generate new token (classic)** button.
-
-4. **Set Up the Token Details**:
-    - **Token Name**: Enter `jad-maven-public-repository` as the name for the token.
-    - **Expiration**: Choose an expiration date. For example, 90 days is a good option, but you can select no expiration
-      if you prefer.
-    - **Permissions**: Scroll down to **Select scopes** and check the following:
-        - `read:packages` - Required for accessing GitHub Packages.
-    - Leave other scopes unchecked.
-
-5. **Generate the Token**:
-    - Click the **Generate token** button at the bottom of the page.
-
-6. **Save the Token**:
-    - Once the token is generated, **copy it immediately**. You will not be able to see it again after leaving the page.
-    - Save the token securely, for example in a password manager or a safe file.
-
----
-
-## Use the Token
-
-**Add the Token to Maven Settings**:
-
-- Open or create the file `settings.xml` located in:
-- `~/.m2/settings.xml` (Linux/Mac).
-- `%USERPROFILE%\.m2\settings.xml` (Windows).
-- Add the following entry inside the `<servers>` section:
-
-```xml
-
-<servers>
-    <server>
-        <id>maven-public-repository</id>
-        <username>[Your GitHub Username]</username>
-        <password>[Your Token]</password>
-    </server>
-</servers>
+    TextWindow textWindow = new TextWindow(settings);
+    textWindow.setVisible(true);
+    textWindow.display("Hello, World!\nThis is a sample text window.");
+}
 ```
 
-- Replace `[Your GitHub Username]` with your GitHub username.
-- Replace `[Your Token]` with the token you just created.
+## Example with Event Handling
 
----
+```java
+    public static void main(String[] args) {
+    TextWindowSettings settings = new TextWindowSettings();
+    settings.addKeyboardListener(KeyEvent.VK_ESCAPE, "exit");
+    settings.addKeyboardListener(KeyEvent.VK_M, "mouseCoordinateDisplay");
+    settings.addKeyboardListener(KeyEvent.VK_F, "changeForegroundColor");
+    settings.addKeyboardListener(KeyEvent.VK_B, "changeBackgroundColor");
+    settings.setListenMouse(true);
+    settings.setMouseVisible(true);
+    TextWindow textWindow = new TextWindow(settings);
+    textWindow.setVisible(true);
 
-## How to Use the Maven Repository
+    Point lastMousePosition;
+    while (textWindow.isOff("exit")) {
+        lastMousePosition = textWindow.getMousePosition();
+        StringBuilder message = new StringBuilder("Press ESC to exit.\n");
+        message.append("Press M to toggle mouse coordinate display.\n");
+        message.append("Press F to change foreground color.\n");
+        message.append("Press B to change background color.\n");
+        if (textWindow.isOn("mouseCoordinateDisplay")) {
+            message.append("Mouse position: ").append(lastMousePosition);
+        }
+        if (textWindow.isOn("changeForegroundColor")) {
+            textWindow.setForeground(Color.GREEN);
+        } else {
+            textWindow.setForeground(Color.BLACK);
+        }
+        if (textWindow.isOn("changeBackgroundColor")) {
+            textWindow.setBackground(Color.LIGHT_GRAY);
+        } else {
+            textWindow.setBackground(Color.WHITE);
+        }
 
-To add this repository to your maven project, add the following lines to your `pom.xml`:
-
-```xml
-
-<repositories>
-    <repository>
-        <id>jad-maven-public-repository</id>
-        <url>https://maven.pkg.github.com/Jean-Aymeric/maven-public-repository</url>
-    </repository>
-</repositories>
+        for (int numButton = 1; numButton < 4; numButton++) {
+            Point clickedPosition = textWindow.getMouseClickedPosition(numButton);
+            if (clickedPosition != null) {
+                message.append("\nMouse button ").append(numButton).append(" clicked at: ").append(clickedPosition);
+            }
+        }
+        textWindow.display(message.toString());
+    }
+    textWindow.close();
+}
 ```
 
-After that, you can add the dependencies you need in the `dependencies` section of your `pom.xml` file. For example:
+## Licence
 
-```xml
-
-<dependency>
-    <groupId>com.jad</groupId>
-    <artifactId>textwindow</artifactId>
-    <version>1.0.0</version>
-</dependency>
-```
-
----
-
-By following these steps, you’ll be able to create and use a GitHub token to access the Maven repository
-`jad-maven-public-repository` successfully.
-
----
-
-## Important Notes
-
-- **Keep Your Token Secure**:
-    - Never share your token publicly or upload it to public repositories like GitHub. If it gets exposed, GitHub will
-      automatically revoke the token.
-
-- **Token Expiration**:
-    - When the token expires, you’ll need to generate a new one and update it in your `settings.xml`.
-
-- **Troubleshooting**:
-    - If Maven fails to authenticate or returns a 401 error, double-check that:
-        - The token has the `read:packages` scope enabled.
-        - Your GitHub username and token are correctly added to the `settings.xml` file.
+This project is licensed under the GNU General Public License v3.0 or later.
+See the LICENSE file for details.

@@ -156,6 +156,25 @@ public final class TextWindowSettings {
     }
 
     /**
+     * Returns the screen dimension of the text window in characters.
+     *
+     * @return - the screen dimension of the text window in characters
+     */
+    public Dimension getScreenDimension() {
+        return new Dimension(this.screenWidth, this.screenHeight);
+    }
+
+    /**
+     * Sets the screen dimension of the text window in characters.
+     *
+     * @param dimension - the screen dimension of the text window in characters
+     */
+    public void setScreenDimension(final Dimension dimension) {
+        this.setScreenHeight(dimension.height);
+        this.setScreenWidth(dimension.width);
+    }
+
+    /**
      * Returns the width of the text window in characters.
      *
      * @return - the width of the text window in characters
