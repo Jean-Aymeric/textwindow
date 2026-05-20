@@ -1,35 +1,50 @@
 package com.jad.textwindow;
 
 
-import javax.swing.*;
-import java.awt.*;
-import java.awt.event.ActionEvent;
-import java.awt.event.MouseEvent;
-import java.awt.event.MouseListener;
-import java.awt.event.MouseMotionListener;
-import java.awt.image.BufferedImage;
+import javafx.application.Platform;
+import javafx.geometry.Insets;
+import javafx.geometry.Point2D;
+import javafx.scene.Cursor;
+import javafx.scene.Scene;
+import javafx.scene.control.TextArea;
+import javafx.scene.input.KeyEvent;
+import javafx.scene.input.MouseButton;
+import javafx.scene.input.MouseEvent;
+import javafx.scene.paint.Color;
+import javafx.scene.text.Font;
+import javafx.scene.text.Text;
+import javafx.stage.Stage;
+
 import java.util.List;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 
 /**
- * A simple text window that displays text.
- * The text is displayed in a JTextArea with a specified font size.
+ * A simple text window that displays text using JavaFX.
+ * The text is displayed in a TextArea with a specified font size.
  * The window is maximized and resizable.
  * The text area is not editable and has a white background with black text.
  * The font is set to Cascadia Mono.
  * The window can be closed by clicking the close button.
  * The window can be displayed with a title, font size, background color, and foreground color.
- * The default font size is 12f, the default background color is white, and the default foreground color is black.
+ * The default font size is 14f, the default background color is white, and the default foreground color is black.
  */
-public class TextWindow extends JFrame {
+public class TextWindow {
     private final int fontWidth;
     private final int fontHeight;
-    private final JTextArea textArea;
-    private final Dimension screenSize;
+    private TextArea textArea;
+    private final int screenWidth;
+    private final int screenHeight;
     private final List<TWBooleanActionState> actionStates = new java.util.ArrayList<>();
     private final List<TWMouseActionState> mouseStates = new java.util.ArrayList<>();
-    private final JComponent glassPane;
-    private Point mousePosition = new Point(0, 0);
-    private Point lastMousePressedPosition = null;
+    private Stage stage;
+    private volatile Point2D mousePosition = new Point2D(0, 0);
+    private volatile Point2D lastMousePressedPosition = null;
+
+    /** Holds the latest text to display; coalesces rapid display() calls. */
+    private final AtomicReference<String> pendingText = new AtomicReference<>();
+    private final AtomicBoolean updateScheduled = new AtomicBoolean(false);
 
     /**
      * Default constructor.
@@ -47,78 +62,87 @@ public class TextWindow extends JFrame {
      *
      * @param settings - the settings for the text window
      */
-    public TextWindow(TextWindowSettings settings) {
-        super(settings.getTitle());
-
-        this.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-        this.setExtendedState(this.getExtendedState() | JFrame.MAXIMIZED_BOTH);
-        this.setResizable(true);
-        this.setLocationRelativeTo(null);
-        this.setLayout(new BorderLayout());
-
-        this.textArea = this.createTextArea(settings);
-
-        this.fontWidth = this.textArea.getFontMetrics(this.textArea.getFont()).charWidth('M');
-        this.fontHeight = this.textArea.getFontMetrics(this.textArea.getFont()).getHeight();
-        this.screenSize = new Dimension(settings.getScreenWidth(), settings.getScreenHeight());
-        final Point temporary = this.textAreaPositionToRealPosition(
-                new Point(settings.getScreenWidth(), settings.getScreenHeight()));
-        this.textArea.setSize(temporary.x, temporary.y);
-        this.createPanel(settings);
-
-        this.glassPane = (JComponent) this.getGlassPane();
-        this.glassPane.setVisible(true);
-        this.glassPane.setBackground(Color.PINK);
-        this.glassPane.setOpaque(false);
-
-        this.pack();
-        this.setLocationRelativeTo(null);
-
-        if (settings.isListenMouse()) {
-            this.glassPane.addMouseMotionListener(new MouseMotionHandler());
-            this.glassPane.addMouseListener(new MouseClickHandler());
-            this.createMouseStates();
+    public TextWindow(final TextWindowSettings settings) {
+        try {
+            Platform.startup(() -> {});
+        } catch (IllegalStateException ignored) {
+            // JavaFX platform already initialized
         }
 
-        if (settings.isListenKeyboard()) {
-            this.createKeyboardActionListeners(settings.getKeyboardListeners());
-            this.createActionPerformers(settings.getKeyboardListeners());
-            this.createActionStates(settings.getKeyboardListeners());
+        this.screenWidth = settings.getScreenWidth();
+        this.screenHeight = settings.getScreenHeight();
+
+        final int[] fontDims = new int[2];
+        final CountDownLatch initLatch = new CountDownLatch(1);
+
+        Platform.runLater(() -> {
+            final Font font = settings.getFont();
+
+            // Measure monospace character dimensions
+            final Text measurer = new Text("M");
+            measurer.setFont(font);
+            fontDims[0] = (int) Math.ceil(measurer.getBoundsInLocal().getWidth());
+            fontDims[1] = (int) Math.ceil(measurer.getBoundsInLocal().getHeight());
+
+            this.textArea = new TextArea();
+            this.textArea.setFont(font);
+            this.textArea.setEditable(false);
+            this.textArea.setWrapText(false);
+            this.textArea.setStyle(this.buildStyle(settings.getBackgroundColor(), settings.getForegroundColor()));
+
+            final Scene scene = new Scene(this.textArea);
+            this.stage = new Stage();
+            this.stage.setTitle(settings.getTitle());
+            this.stage.setScene(scene);
+            this.stage.setMaximized(true);
+            this.stage.setOnCloseRequest(e -> {
+                Platform.exit();
+                System.exit(0);
+            });
+
+            if (settings.isListenMouse()) {
+                this.createMouseStates();
+                scene.setOnMouseMoved(this::handleMouseMoved);
+                scene.setOnMouseDragged(this::handleMouseDragged);
+                scene.setOnMouseClicked(this::handleMouseClicked);
+                scene.setOnMouseReleased(this::handleMouseReleased);
+            }
+
+            if (settings.isListenKeyboard()) {
+                this.registerKeyHandlers(scene, settings.getKeyboardListeners());
+                this.createActionStates(settings.getKeyboardListeners());
+            }
+
+            if (!settings.isMouseVisible()) {
+                scene.setCursor(Cursor.NONE);
+            }
+
+            initLatch.countDown();
+        });
+
+        try {
+            initLatch.await();
+        } catch (final InterruptedException e) {
+            Thread.currentThread().interrupt();
         }
 
-        if (!settings.isMouseVisible()) {
-            this.setMouseCursorInvisible();
-        }
+        this.fontWidth = fontDims[0];
+        this.fontHeight = fontDims[1];
     }
 
-    private JTextArea createTextArea(TextWindowSettings settings) {
-        JTextArea textArea = new JTextArea(settings.getScreenHeight(), settings.getScreenWidth());
-        textArea.setFont(settings.getFont());
-        textArea.setEditable(false);
-        textArea.setEnabled(false);
-        textArea.setForeground(settings.getForegroundColor());
-        textArea.setBackground(settings.getBackgroundColor());
-        textArea.setDisabledTextColor(settings.getForegroundColor());
-        textArea.addMouseListener(null);
-        textArea.addMouseMotionListener(null);
-        textArea.addKeyListener(null);
-        return textArea;
+    private String buildStyle(final Color bg, final Color fg) {
+        return "-fx-control-inner-background: " + toWebColor(bg) + ";" +
+               "-fx-text-fill: " + toWebColor(fg) + ";" +
+               "-fx-highlight-fill: transparent;" +
+               "-fx-highlight-text-fill: " + toWebColor(fg) + ";";
     }
 
-    private Point textAreaPositionToRealPosition(final Point point) {
-        int x = point.x * this.fontWidth;
-        int y = point.y * this.fontHeight;
-        return new Point(x, y);
-    }
-
-    private void createPanel(final TextWindowSettings settings) {
-        final JPanel panel = new JPanel();
-        panel.setBackground(settings.getBackgroundColor());
-        panel.addMouseListener(null);
-        panel.addMouseMotionListener(null);
-        panel.addKeyListener(null);
-        panel.add(this.textArea, BorderLayout.CENTER);
-        this.setContentPane(panel);
+    private String toWebColor(final Color color) {
+        return String.format("rgba(%d,%d,%d,%.2f)",
+                             (int) (color.getRed() * 255),
+                             (int) (color.getGreen() * 255),
+                             (int) (color.getBlue() * 255),
+                             color.getOpacity());
     }
 
     private void createMouseStates() {
@@ -127,102 +151,156 @@ public class TextWindow extends JFrame {
         this.mouseStates.add(new TWMouseActionState("button3"));
     }
 
-    private void createKeyboardActionListeners(final List<TWKeyboardListener> keyboardListeners) {
-        final InputMap inputMap = this.glassPane.getInputMap();
-        for (TWKeyboardListener listener : keyboardListeners) {
-            inputMap.put(KeyStroke.getKeyStroke(listener.keyEvent(), 0, false),
-                         listener.getKey() + "-pressed");
-            inputMap.put(KeyStroke.getKeyStroke(listener.keyEvent(), 0, true),
-                         listener.getKey() + "-released");
-        }
-    }
-
-    private void createActionPerformers(final List<TWKeyboardListener> keyboardListeners) {
-        final ActionMap actionMap = this.glassPane.getActionMap();
-        for (TWKeyboardListener listener : keyboardListeners) {
-            actionMap.put(listener.getKey() + "-pressed",
-                          new AbstractAction() {
-                              @Override
-                              public void actionPerformed(final ActionEvent actionEvent) {
-                                  listener.press();
-                              }
-                          });
-            actionMap.put(listener.getKey() + "-released",
-                          new AbstractAction() {
-                              @Override
-                              public void actionPerformed(final ActionEvent actionEvent) {
-                                  listener.release();
-                              }
-                          });
-        }
+    private void registerKeyHandlers(final Scene scene, final List<TWKeyboardListener> listeners) {
+        scene.addEventHandler(KeyEvent.KEY_PRESSED, event -> {
+            for (final TWKeyboardListener listener : listeners) {
+                if (listener.keyCode() == event.getCode()) {
+                    listener.press();
+                    break;
+                }
+            }
+        });
+        scene.addEventHandler(KeyEvent.KEY_RELEASED, event -> {
+            for (final TWKeyboardListener listener : listeners) {
+                if (listener.keyCode() == event.getCode()) {
+                    listener.release();
+                    break;
+                }
+            }
+        });
     }
 
     private void createActionStates(final List<TWKeyboardListener> keyboardListeners) {
-        for (TWKeyboardListener listener : keyboardListeners) {
+        for (final TWKeyboardListener listener : keyboardListeners) {
             this.actionStates.add(listener.state());
         }
     }
 
-    private void setMouseCursorInvisible() {
-        final BufferedImage cursorImg = new BufferedImage(16, 16, BufferedImage.TYPE_INT_ARGB);
-        final Cursor blankCursor = Toolkit.getDefaultToolkit().createCustomCursor(
-                cursorImg, new Point(0, 0), "blank cursor");
-        this.glassPane.setCursor(blankCursor);
+    private void handleMouseMoved(final MouseEvent event) {
+        this.mousePosition = new Point2D(event.getX(), event.getY());
+    }
+
+    private void handleMouseDragged(final MouseEvent event) {
+        if (this.lastMousePressedPosition == null) {
+            this.lastMousePressedPosition = this.sceneToTextPosition(event.getX(), event.getY());
+        }
+    }
+
+    private void handleMouseClicked(final MouseEvent event) {
+        final int button = this.toButtonNumber(event.getButton());
+        if (button > 0) this.setMouseClick(button, event.getX(), event.getY());
+    }
+
+    private void handleMouseReleased(final MouseEvent event) {
+        final Point2D releasePos = this.sceneToTextPosition(event.getX(), event.getY());
+        if (this.lastMousePressedPosition != null && this.lastMousePressedPosition.equals(releasePos)) {
+            final int button = this.toButtonNumber(event.getButton());
+            if (button > 0) this.setMouseClick(button, event.getX(), event.getY());
+        }
+        this.lastMousePressedPosition = null;
+    }
+
+    private int toButtonNumber(final MouseButton button) {
+        return switch (button) {
+            case PRIMARY -> 1;
+            case MIDDLE -> 2;
+            case SECONDARY -> 3;
+            default -> 0;
+        };
     }
 
     /**
-     * Closes the text window.
+     * Converts scene coordinates to character-grid (column, row) position.
+     * Accounts for TextArea internal insets.
+     */
+    private Point2D sceneToTextPosition(final double sceneX, final double sceneY) {
+        final Insets insets = this.textArea.getInsets();
+        final double contentX = sceneX - insets.getLeft();
+        final double contentY = sceneY - insets.getTop();
+        final int col = (int) Math.max(0, Math.floor(contentX / this.fontWidth));
+        final int row = (int) Math.max(0, Math.floor(contentY / this.fontHeight));
+        return new Point2D(col, row);
+    }
+
+    private void setMouseClick(final int button, final double x, final double y) {
+        final TWMouseActionState state = this.getMouseState(button);
+        if (state != null) state.setValue(this.sceneToTextPosition(x, y));
+    }
+
+    private TWMouseActionState getMouseState(final int button) {
+        for (final TWMouseActionState state : this.mouseStates) {
+            if (state.is("button" + button)) return state;
+        }
+        return null;
+    }
+
+    /**
+     * Makes the window visible or hidden.
+     *
+     * @param visible - true to show, false to hide
+     */
+    public void setVisible(final boolean visible) {
+        Platform.runLater(() -> {
+            if (visible) this.stage.show();
+            else this.stage.hide();
+        });
+    }
+
+    /**
+     * Closes the text window and exits the JavaFX platform.
      */
     public void close() {
-        this.dispose();
+        Platform.runLater(() -> {
+            this.stage.close();
+            Platform.exit();
+        });
     }
 
     /**
      * Displays the text in the window.
+     * Rapid successive calls are coalesced: only the most recent text is rendered.
      *
      * @param text - the text to be displayed
      */
     public void display(final String text) {
-        StringBuilder stringBuilder = new StringBuilder();
-        String[] lines = text.split("\n");
-        for (int i = 0; i < this.screenSize.height; i++) {
-            stringBuilder
-                    .append(TextWindowUtils.formatString((i < lines.length) ? lines[i] : "", this.screenSize.width))
-                    .append(((i + 1) == this.screenSize.height) ? "" : "\n");
+        final StringBuilder sb = new StringBuilder();
+        final String[] lines = text.split("\n");
+        for (int i = 0; i < this.screenHeight; i++) {
+            sb.append(TextWindowUtils.formatString((i < lines.length) ? lines[i] : "", this.screenWidth));
+            if ((i + 1) < this.screenHeight) sb.append("\n");
         }
-        this.textArea.setText(stringBuilder.toString());
-    }
+        final String formatted = sb.toString();
 
-    @Override
-    public Point getMousePosition() {
-        return this.realPositionToTextAreaPosition(this.mousePosition);
-    }
-
-    private Point realPositionToTextAreaPosition(final Point position) {
-        Point textAreaPosition = this.textArea.getLocationOnScreen();
-        Point glassPanePosition = this.glassPane.getLocationOnScreen();
-        int deltaX = textAreaPosition.x - glassPanePosition.x;
-        int deltaY = textAreaPosition.y - glassPanePosition.y;
-        final int x = Math.floorDiv(position.x - deltaX, this.fontWidth);
-        final int y = Math.floorDiv(position.y - deltaY, this.fontHeight);
-        return new Point(x, y);
-    }
-
-    @Override
-    public void setForeground(Color foreground) {
-        super.setForeground(foreground);
-        if (this.textArea != null) {
-            this.textArea.setForeground(foreground);
-            this.textArea.setDisabledTextColor(foreground);
+        this.pendingText.set(formatted);
+        if (this.updateScheduled.compareAndSet(false, true)) {
+            Platform.runLater(() -> {
+                this.updateScheduled.set(false);
+                final String t = this.pendingText.get();
+                if (t != null) this.textArea.setText(t);
+            });
         }
     }
 
-    @Override
-    public void setBackground(Color background) {
-        super.setBackground(background);
-        if (this.textArea != null) {
-            this.textArea.setBackground(background);
-        }
+    /**
+     * Returns the current mouse position as a character-grid coordinate.
+     *
+     * @return the column/row position of the mouse cursor
+     */
+    public Point2D getMousePosition() {
+        return this.sceneToTextPosition(this.mousePosition.getX(), this.mousePosition.getY());
+    }
+
+    /**
+     * Returns the position of the mouse when the given button was last clicked.
+     *
+     * @param button - the button number (1=primary, 2=middle, 3=secondary)
+     *
+     * @return the character-grid position of the last click, or null if not clicked
+     */
+    public Point2D getMouseClickedPosition(final int button) {
+        final TWMouseActionState state = this.getMouseState(button);
+        if (state != null) return state.getValue();
+        return null;
     }
 
     /**
@@ -244,80 +322,46 @@ public class TextWindow extends JFrame {
      * @return true if the action is on, false otherwise
      */
     public boolean isOn(final String action) {
-        for (TWBooleanActionState state : this.actionStates) {
+        for (final TWBooleanActionState state : this.actionStates) {
             if (state.is(action)) return state.getValue();
         }
         return false;
     }
 
-    private void setMouseClic(final int button, final Point point) {
-        TWMouseActionState state = this.getMouseState(button);
-        if (state != null) state.setValue(this.realPositionToTextAreaPosition(point));
-    }
-
-    private TWMouseActionState getMouseState(final int button) {
-        for (TWMouseActionState state : this.mouseStates) {
-            if (state.is("button" + button)) return state;
+    /**
+     * Sets the foreground (text) color of the window.
+     *
+     * @param color - the JavaFX color to use for text
+     */
+    public void setForeground(final Color color) {
+        if (this.textArea == null) return;
+        final String style = this.textArea.getStyle()
+                .replaceAll("-fx-text-fill:[^;]+;", "")
+                .replaceAll("-fx-highlight-text-fill:[^;]+;", "");
+        final String newStyle = style +
+                                "-fx-text-fill: " + toWebColor(color) + ";" +
+                                "-fx-highlight-text-fill: " + toWebColor(color) + ";";
+        if (Platform.isFxApplicationThread()) {
+            this.textArea.setStyle(newStyle);
+        } else {
+            Platform.runLater(() -> this.textArea.setStyle(newStyle));
         }
-        return null;
     }
 
     /**
-     * Returns the position of the mouse when it was clicked.
+     * Sets the background color of the window.
      *
-     * @param button - the button that was clicked
-     *
-     * @return the position of the mouse when it was clicked
+     * @param color - the JavaFX color to use for the background
      */
-    public Point getMouseClickedPosition(final int button) {
-        TWMouseActionState state = this.getMouseState(button);
-        if (state != null) return state.getValue();
-        return null;
-    }
-
-    private class MouseMotionHandler implements MouseMotionListener {
-        @Override
-        public void mouseDragged(final MouseEvent event) {
-            if (TextWindow.this.lastMousePressedPosition == null) {
-                TextWindow.this.lastMousePressedPosition = TextWindow.this.realPositionToTextAreaPosition(
-                        event.getPoint());
-            }
-        }
-
-        @Override
-        public synchronized void mouseMoved(final MouseEvent event) {
-            TextWindow.this.mousePosition = event.getPoint();
-        }
-    }
-
-    private class MouseClickHandler implements MouseListener {
-        @Override
-        public void mouseClicked(final MouseEvent event) {
-            TextWindow.this.setMouseClic(event.getButton(), event.getPoint());
-        }
-
-        @Override
-        public void mousePressed(final MouseEvent event) {
-        }
-
-        @Override
-        public void mouseReleased(final MouseEvent event) {
-            if ((TextWindow.this.lastMousePressedPosition != null) &&
-                    (TextWindow.this.lastMousePressedPosition.equals(
-                            TextWindow.this.realPositionToTextAreaPosition(event.getPoint())))) {
-                TextWindow.this.setMouseClic(event.getButton(), event.getPoint());
-            }
-            TextWindow.this.lastMousePressedPosition = null;
-        }
-
-        @Override
-        public void mouseEntered(final MouseEvent e) {
-
-        }
-
-        @Override
-        public void mouseExited(final MouseEvent e) {
-
+    public void setBackground(final Color color) {
+        if (this.textArea == null) return;
+        final String style = this.textArea.getStyle()
+                .replaceAll("-fx-control-inner-background:[^;]+;", "");
+        final String newStyle = style + "-fx-control-inner-background: " + toWebColor(color) + ";";
+        if (Platform.isFxApplicationThread()) {
+            this.textArea.setStyle(newStyle);
+        } else {
+            Platform.runLater(() -> this.textArea.setStyle(newStyle));
         }
     }
 }

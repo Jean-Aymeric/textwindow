@@ -1,11 +1,11 @@
 package com.jad.textwindow;
 
-import java.awt.*;
-import java.awt.event.KeyEvent;
-import java.io.IOException;
+import javafx.scene.input.KeyCode;
+import javafx.scene.paint.Color;
+import javafx.scene.text.Font;
+
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Objects;
 
 /**
  * This class contains the settings for the TextWindow class.
@@ -116,7 +116,8 @@ public final class TextWindowSettings {
      * @param foregroundColor - the foreground color of the text window
      */
     public void setForegroundColor(final Color foregroundColor) {
-        this.foregroundColor = (foregroundColor == null) ? TextWindowUtils.DEFAULT_FOREGROUND_COLOR : foregroundColor;
+        this.foregroundColor =
+                (foregroundColor == null) ? TextWindowUtils.DEFAULT_FOREGROUND_COLOR : foregroundColor;
     }
 
     /**
@@ -197,38 +198,36 @@ public final class TextWindowSettings {
 
     /**
      * Adds a keyboard listener to the text window.
-     * If at least one listener is added, the text window will listen to keyboard events. The listenKeyboard property will be set to true.
+     * If at least one listener is added, the text window will listen to keyboard events.
+     * The listenKeyboard property will be set to true.
      *
-     * @param keyEvent - the key event to listen to
-     * @param key      - the key to store the state of the key event
+     * @param keyCode - the JavaFX KeyCode to listen to
+     * @param key     - the key to store the state of the key event
      */
-    public void addKeyboardListener(final int keyEvent, final String key) {
+    public void addKeyboardListener(final KeyCode keyCode, final String key) {
         for (final TWKeyboardListener listener : this.keyboardListeners) {
-            if (listener.keyEvent() == keyEvent) {
-                throw new IllegalArgumentException(
-                        "Keyboard listener " + KeyEvent.getKeyText(keyEvent) + " already added.");
+            if (listener.keyCode() == keyCode) {
+                throw new IllegalArgumentException("Keyboard listener " + keyCode + " already added.");
             }
         }
-        final TWKeyboardListener keyboardListener = new TWKeyboardListener(keyEvent, new TWBooleanActionState(key));
+        final TWKeyboardListener keyboardListener = new TWKeyboardListener(keyCode, new TWBooleanActionState(key));
         if (!this.listenKeyboard) this.listenKeyboard = true;
         this.keyboardListeners.add(keyboardListener);
     }
 
     /**
-     * Returns the font of the text window.
+     * Returns the JavaFX font of the text window.
+     * Must be called on the JavaFX Application Thread (after Platform.startup).
      *
      * @return - the font of the text window
      */
     public Font getFont() {
         if (this.font == null) {
-            try {
-                this.font = Font.createFont(
-                                Font.TRUETYPE_FONT,
-                                Objects.requireNonNull(
-                                        TextWindow.class.getResourceAsStream("/" + TextWindowUtils.DEFAULT_FONT)))
-                        .deriveFont(this.fontSize);
-            } catch (final FontFormatException | IOException exception) {
-                throw new RuntimeException(exception);
+            this.font = Font.loadFont(
+                    TextWindow.class.getResourceAsStream("/" + TextWindowUtils.DEFAULT_FONT),
+                    this.fontSize);
+            if (this.font == null) {
+                this.font = new Font("Monospaced", this.fontSize);
             }
         }
         return this.font;
@@ -237,7 +236,7 @@ public final class TextWindowSettings {
     /**
      * Sets the font of the text window.
      *
-     * @param font - the font of the text window
+     * @param font - the JavaFX font of the text window
      */
     public void setFont(final Font font) {
         this.font = font;

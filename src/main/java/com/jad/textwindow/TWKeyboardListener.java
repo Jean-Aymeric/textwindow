@@ -1,6 +1,8 @@
 package com.jad.textwindow;
 
-record TWKeyboardListener(int keyEvent, TWBooleanActionState state) {
+import javafx.scene.input.KeyCode;
+
+record TWKeyboardListener(KeyCode keyCode, TWBooleanActionState state) {
     public String getKey() {
         return this.state.getKey();
     }
