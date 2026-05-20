@@ -3,7 +3,7 @@ package com.jad.textwindow;
 @SuppressWarnings("unused")
 abstract class TWActionState<E> {
     private final String key;
-    private E value;
+    private volatile E value;
 
     TWActionState(final String key) {
         this.key = key;
