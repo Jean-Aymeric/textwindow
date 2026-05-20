@@ -1,6 +1,6 @@
 package com.jad.textwindow;
 
-import java.awt.*;
+import javafx.scene.paint.Color;
 
 enum TextWindowUtils {
     ;
