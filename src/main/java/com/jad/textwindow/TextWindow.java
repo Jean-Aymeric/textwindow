@@ -152,7 +152,7 @@ public class TextWindow {
     }
 
     private void registerKeyHandlers(final Scene scene, final List<TWKeyboardListener> listeners) {
-        scene.addEventHandler(KeyEvent.KEY_PRESSED, event -> {
+        scene.addEventFilter(KeyEvent.KEY_PRESSED, event -> {
             for (final TWKeyboardListener listener : listeners) {
                 if (listener.keyCode() == event.getCode()) {
                     listener.press();
@@ -160,7 +160,7 @@ public class TextWindow {
                 }
             }
         });
-        scene.addEventHandler(KeyEvent.KEY_RELEASED, event -> {
+        scene.addEventFilter(KeyEvent.KEY_RELEASED, event -> {
             for (final TWKeyboardListener listener : listeners) {
                 if (listener.keyCode() == event.getCode()) {
                     listener.release();
@@ -235,15 +235,27 @@ public class TextWindow {
     }
 
     /**
-     * Makes the window visible or hidden.
+     * Makes the window visible or hidden. Blocks until the JavaFX stage has processed the request,
+     * ensuring the window is ready to receive events before returning.
      *
      * @param visible - true to show, false to hide
      */
     public void setVisible(final boolean visible) {
+        final CountDownLatch latch = new CountDownLatch(1);
         Platform.runLater(() -> {
-            if (visible) this.stage.show();
-            else this.stage.hide();
+            if (visible) {
+                this.stage.show();
+                this.stage.requestFocus();
+            } else {
+                this.stage.hide();
+            }
+            latch.countDown();
         });
+        try {
+            latch.await();
+        } catch (final InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
     }
 
     /**
